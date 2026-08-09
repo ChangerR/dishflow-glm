@@ -24,8 +24,17 @@ App({
   } as GlobalData,
   onLaunch() {
     // 小程序自身的 AppID（用于 X-Wechat-Appid）。
-    const accountInfo = wx.getAccountInfoSync();
-    this.globalData.appid = accountInfo.miniProgram.appId;
+    try {
+      const accountInfo = wx.getAccountInfoSync();
+      this.globalData.appid = accountInfo.miniProgram.appId;
+    } catch (e) {
+      this.globalData.appid = '';
+    }
+    // 演示模式：如果小程序 AppID 未在服务端注册（touristappid 等），
+    // 使用演示门店的 AppID，使菜单/下单可联调。
+    if (!this.globalData.appid || this.globalData.appid === 'touristappid') {
+      this.globalData.appid = 'wxdemoappid0001';
+    }
     // 清除过期桌台上下文（PRD §4.1.1）。
     const t = wx.getStorageSync('table_token');
     const texp = wx.getStorageSync('table_expires');

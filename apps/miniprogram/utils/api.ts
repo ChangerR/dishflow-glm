@@ -28,7 +28,7 @@ export function request<T>(method: 'GET' | 'POST' | 'DELETE', path: string, data
   }
   return new Promise<T>((resolve, reject) => {
     wx.request({
-      url: 'http://127.0.0.1:8080' + path, // 生产替换为真实域名
+      url: 'http://172.17.186.176:8090' + path, // WSL 局域网 IP + 端口
       method,
       data: data as string | WechatMiniprogram.IAnyObject | undefined,
       header,

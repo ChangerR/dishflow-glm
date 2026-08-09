@@ -1,0 +1,7 @@
+.me { padding: 12px; }
+.profile { text-align: center; padding: 24px; }
+.member-no { font-size: 20px; font-weight: 600; display: block; }
+.points { color: #ff4d4f; margin-top: 8px; display: block; }
+.menu { padding: 0; }
+.item { padding: 16px; border-bottom: 1px solid #f0f0f0; }
+.item:last-child { border-bottom: none; }

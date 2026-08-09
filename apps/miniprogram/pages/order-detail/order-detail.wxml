@@ -1,0 +1,20 @@
+<view class="detail" wx:if="{{order}}">
+  <view class="card state-card">
+    <text class="no">取餐号 #{{order.pickup_no || '-'}}</text>
+    <text wx:if="{{order.scheduled_for}}" class="sched">预约自取 {{order.scheduled_for}}</text>
+  </view>
+  <view class="card">
+    <view wx:for="{{order.items}}" wx:key="*this" class="item">
+      <text>{{item.sku_name}} ×{{item.quantity}}</text>
+      <text>¥{{item.line_amount_cents / 100}}</text>
+    </view>
+    <view class="total">应付 ¥{{order.payable_cents / 100}}</view>
+  </view>
+  <view class="card">
+    <view class="title">订单时间线</view>
+    <view wx:for="{{order.events}}" wx:key="*this" class="event">
+      <text class="summary">{{item.summary}}</text>
+      <text class="time">{{item.created_at}}</text>
+    </view>
+  </view>
+</view>

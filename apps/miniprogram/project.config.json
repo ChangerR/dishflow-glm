@@ -1,0 +1,15 @@
+{
+  "miniprogramRoot": "./",
+  "projectname": "dishflow-miniprogram",
+  "description": "DishFlow 微信点餐小程序（堂食扫码 + 到店自取）",
+  "appid": "touristappid",
+  "setting": {
+    "es6": true,
+    "enhance": true,
+    "postcss": true,
+    "minified": true,
+    "urlCheck": false
+  },
+  "compileType": "miniprogram",
+  "libVersion": "3.0.0"
+}

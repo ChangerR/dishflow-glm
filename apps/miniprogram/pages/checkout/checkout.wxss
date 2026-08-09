@@ -1,0 +1,13 @@
+.checkout { padding: 12px; padding-bottom: 70px; }
+.card { background: #fff; border-radius: 8px; padding: 12px; margin-bottom: 10px; }
+.row { font-size: 15px; font-weight: 500; }
+.pickup-toggle { display: flex; gap: 8px; margin-top: 10px; }
+.opt { flex: 1; text-align: center; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; }
+.opt.active { border-color: #1677ff; color: #1677ff; }
+.slots { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.slot { padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 12px; }
+.slot.sel { border-color: #1677ff; background: #e6f4ff; color: #1677ff; }
+.slot.disabled { color: #ccc; background: #fafafa; }
+.line { font-size: 13px; color: #666; margin: 4px 0; }
+.line.total { font-size: 18px; color: #ff4d4f; font-weight: 600; margin-top: 8px; }
+.footer { position: fixed; bottom: 0; left: 0; right: 0; padding: 12px; background: #fff; }

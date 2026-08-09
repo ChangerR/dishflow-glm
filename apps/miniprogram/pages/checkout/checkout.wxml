@@ -1,0 +1,39 @@
+<!-- pages/checkout/checkout.wxml -->
+<view class="checkout">
+  <view class="card">
+    <view class="row">
+      <text>{{scenario === 'DINE_IN' ? '堂食 · ' + tableLabel : '到店自取'}}</text>
+    </view>
+    <view wx:if="{{scenario === 'PICKUP'}}" class="pickup-toggle">
+      <view class="opt {{pickupType === 'IMMEDIATE' ? 'active' : ''}}" data-type="IMMEDIATE" bindtap="switchPickupType">尽快取餐</view>
+      <view class="opt {{pickupType === 'SCHEDULED' ? 'active' : ''}}" data-type="SCHEDULED" bindtap="switchPickupType">预约取餐</view>
+    </view>
+    <view wx:if="{{pickupType === 'SCHEDULED'}}" class="slots">
+      <view
+        wx:for="{{slots}}"
+        wx:key="starts_at"
+        class="slot {{!item.available ? 'disabled' : ''}} {{selectedSlot === item.starts_at ? 'sel' : ''}}"
+        data-starts="{{item.starts_at}}"
+        data-available="{{item.available}}"
+        bindtap="selectSlot"
+      >{{item.label}} ({{item.remaining}}/{{item.capacity}})</view>
+    </view>
+  </view>
+
+  <view class="card" wx:if="{{quote}}">
+    <view class="line">商品 ¥{{quote.item_amount_cents / 100}}</view>
+    <view class="line" wx:if="{{quote.packaging_fee_cents > 0}}">包装 ¥{{quote.packaging_fee_cents / 100}}</view>
+    <view class="line" wx:if="{{quote.discount_cents > 0}}">优惠 -¥{{quote.discount_cents / 100}}</view>
+    <view class="line total">应付 ¥{{payable}}</view>
+  </view>
+
+  <view class="card">
+    <textarea placeholder="备注（选填，最多100字）" value="{{remark}}" bindinput="inputRemark" maxlength="100" />
+  </view>
+
+  <view class="footer">
+    <button type="primary" bindtap="submit" disabled="{{!quote || loading}}">
+      {{loading ? '报价中…' : '提交订单'}}
+    </button>
+  </view>
+</view>

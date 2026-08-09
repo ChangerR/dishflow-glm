@@ -1,0 +1,5 @@
+.cart { padding: 12px; }
+.item { display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 12px; margin-bottom: 8px; border-radius: 8px; }
+.name { font-size: 14px; }
+.qty { display: flex; align-items: center; gap: 10px; }
+.empty { text-align: center; color: #999; padding: 40px; }

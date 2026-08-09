@@ -1,0 +1,12 @@
+<view class="cart">
+  <view wx:for="{{items}}" wx:key="sku_id" class="item">
+    <text class="name">SKU {{item.sku_id}}</text>
+    <view class="qty">
+      <button size="mini" data-item="{{item}}" bindtap="dec">-</button>
+      <text>{{item.quantity}}</text>
+      <button size="mini" data-item="{{item}}" bindtap="inc">+</button>
+    </view>
+  </view>
+  <view wx:if="{{items.length === 0}}" class="empty">购物车为空</view>
+  <button type="primary" bindtap="checkout" wx:if="{{items.length > 0}}">去结算</button>
+</view>

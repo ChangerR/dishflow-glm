@@ -1,0 +1,17 @@
+.header { background: #1677ff; color: #fff; padding: 16px; }
+.store-name { font-size: 18px; font-weight: 600; }
+.status { font-size: 13px; opacity: 0.9; margin-top: 4px; }
+.closed { color: #ffd666; }
+.announce { font-size: 12px; opacity: 0.8; margin-top: 6px; }
+.body { display: flex; height: calc(100vh - 140px); }
+.cats { width: 90px; background: #f0f0f0; }
+.cat { padding: 14px 8px; text-align: center; font-size: 13px; }
+.cat.active { background: #fff; color: #1677ff; border-left: 3px solid #1677ff; }
+.dishes { flex: 1; padding: 8px; }
+.dish { display: flex; background: #fff; border-radius: 8px; padding: 10px; margin-bottom: 8px; }
+.dish image { width: 64px; height: 64px; border-radius: 6px; margin-right: 10px; }
+.info { flex: 1; }
+.name { font-size: 15px; font-weight: 500; }
+.desc { font-size: 12px; color: #999; margin: 4px 0; }
+.price { color: #ff4d4f; font-weight: 600; }
+.cart-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #1677ff; color: #fff; text-align: center; padding: 14px; }

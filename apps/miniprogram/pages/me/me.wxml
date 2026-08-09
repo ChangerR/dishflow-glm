@@ -1,0 +1,14 @@
+<view class="me">
+  <view class="card profile">
+    <block wx:if="{{isMember}}">
+      <text class="member-no">{{memberNo}}</text>
+      <text class="points">积分 {{points}}</text>
+    </block>
+    <button wx:else size="mini" bindtap="onShow">点击登录/入会</button>
+  </view>
+  <view class="card menu">
+    <view class="item" bindtap="wx.navigateTo" data-url="/pages/orders/orders">我的订单</view>
+    <view class="item" bindtap="wx.navigateTo" data-url="/pages/coupons/coupons">我的优惠券</view>
+    <view class="item" wx:if="{{!isMember}}" bindtap="wx.navigateTo" data-url="/pages/membership/membership">加入会员</view>
+  </view>
+</view>

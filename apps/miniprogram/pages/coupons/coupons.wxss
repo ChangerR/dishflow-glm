@@ -1,0 +1,9 @@
+.coupons { padding: 12px; }
+.title { font-size: 15px; font-weight: 600; margin: 12px 0 8px; }
+.coupon { display: flex; align-items: center; gap: 12px; background: #fff; border-radius: 8px; padding: 14px; margin-bottom: 8px; }
+.coupon.USED, .coupon.EXPIRED { opacity: 0.5; }
+.coupon.offer { border-left: 4px solid #ff4d4f; }
+.amt { color: #ff4d4f; font-size: 20px; font-weight: 700; }
+.cond { color: #999; font-size: 12px; flex: 1; }
+.status { font-size: 12px; color: #1677ff; }
+.empty { text-align: center; color: #999; padding: 30px; }

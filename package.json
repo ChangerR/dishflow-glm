@@ -1,0 +1,11 @@
+{
+  "name": "dishflow",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "check": "pnpm --recursive run check",
+    "test": "pnpm --recursive run test",
+    "build": "pnpm --recursive run build"
+  },
+  "packageManager": "pnpm@9.15.0"
+}

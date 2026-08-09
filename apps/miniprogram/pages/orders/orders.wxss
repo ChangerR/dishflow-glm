@@ -1,0 +1,9 @@
+.orders { padding: 12px; }
+.filters { white-space: nowrap; margin-bottom: 10px; }
+.f { display: inline-block; padding: 6px 14px; margin-right: 8px; background: #fff; border-radius: 16px; font-size: 13px; }
+.f.active { background: #1677ff; color: #fff; }
+.card { background: #fff; border-radius: 8px; padding: 12px; margin-bottom: 10px; }
+.top { display: flex; justify-content: space-between; font-weight: 600; }
+.state { color: #1677ff; font-size: 13px; }
+.info { display: flex; justify-content: space-between; margin-top: 8px; color: #666; font-size: 13px; }
+.price { color: #ff4d4f; }

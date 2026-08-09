@@ -1,0 +1,37 @@
+<!-- pages/menu/menu.wxml -->
+<view class="header">
+  <view class="store-name">{{storeName}}</view>
+  <view class="status">
+    <text wx:if="{{scenario === 'DINE_IN'}}">堂食 · {{tableLabel}}</text>
+    <text wx:else>到店自取</text>
+    <text wx:if="{{!businessOpen}}" class="closed">（休息中）</text>
+  </view>
+  <view wx:if="{{announcement}}" class="announce">{{announcement}}</view>
+</view>
+
+<view class="body">
+  <scroll-view class="cats" scroll-y>
+    <view
+      wx:for="{{categories}}"
+      wx:key="id"
+      class="cat {{activeCat === index ? 'active' : ''}}"
+      data-id="{{index}}"
+      bindtap="selectCat"
+    >{{item.name}}</view>
+  </scroll-view>
+
+  <scroll-view class="dishes" scroll-y>
+    <view wx:for="{{dishes}}" wx:key="id" class="dish">
+      <image wx:if="{{item.image_url}}" src="{{item.image_url}}" mode="aspectFill" />
+      <view class="info">
+        <view class="name">{{item.name}}</view>
+        <view class="desc">{{item.description}}</view>
+        <view class="price">¥{{item.start_price_cents / 100}}</view>
+      </view>
+    </view>
+  </scroll-view>
+</view>
+
+<view class="cart-bar" bindtap="goCart">
+  <text>购物车 ({{cartCount}})</text>
+</view>

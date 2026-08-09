@@ -1,0 +1,41 @@
+# Binaries
+/bin/
+/dist/
+*.exe
+*.test
+*.out
+
+# Go build artifacts
+/vendor/
+
+# Local env / secrets
+.env
+.env.*
+!.env.example
+*.local
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Node / frontend (added in P7)
+node_modules/
+apps/*/dist/
+apps/*/.vite/
+*.tsbuildinfo
+
+# Test coverage
+coverage.out
+coverage/
+*.cover
+
+# Docker volumes (local data)
+.docker-data/
+.mysql-data/
+.redis-data/
+
+# OS
+Thumbs.db

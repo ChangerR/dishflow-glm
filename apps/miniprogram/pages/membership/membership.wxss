@@ -1,0 +1,4 @@
+.join { padding: 12px; }
+.card { background: #fff; border-radius: 8px; padding: 20px; text-align: center; }
+.benefit { color: #666; margin-bottom: 20px; }
+.agree { display: flex; align-items: center; justify-content: center; margin-bottom: 20px; font-size: 13px; color: #999; }

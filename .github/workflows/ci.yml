@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  backend:
+    name: Go vet + test + build
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: rootpw
+          MYSQL_DATABASE: dishflow
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -prootpw"
+          --health-interval=5s --health-timeout=5s --health-retries=30
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s --health-timeout=3s --health-retries=30
+    env:
+      SHOP_DATABASE_DSN: root:rootpw@tcp(127.0.0.1:3306)/dishflow?parseTime=true&loc=UTC&charset=utf8mb4
+      SHOP_REDIS_ADDR: redis://127.0.0.1:6379/0
+      SHOP_DEV_MODE: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Download deps
+        run: go mod download
+      - name: Vet
+        run: go vet ./...
+      - name: Test (race)
+        run: go test ./... -race
+      - name: Test (integration)
+        run: go test -tags=integration ./... -race
+      - name: Build
+        run: go build ./...
+      - name: Migrate up
+        run: go run ./cmd/migrate up
+      - name: Migrate down/up cycle
+        run: |
+          go run ./cmd/migrate down 10
+          go run ./cmd/migrate up
+
+  openapi:
+    name: OpenAPI lint (Redocly)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Lint OpenAPI
+        run: npx --yes @redocly/cli@latest lint openapi/openapi.yaml
+
+  frontend:
+    name: Frontend check/test/build (admin + miniprogram)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: TypeScript check
+        run: pnpm --recursive run check
+      - name: Test
+        run: pnpm --recursive run test
+      - name: Build
+        run: pnpm --recursive run build

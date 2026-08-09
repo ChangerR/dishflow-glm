@@ -1,0 +1,19 @@
+<view class="orders">
+  <scroll-view class="filters" scroll-x>
+    <text class="f {{filter === '' ? 'active' : ''}}" data-status="" bindtap="setFilter">全部</text>
+    <text class="f {{filter === 'PENDING_PAYMENT' ? 'active' : ''}}" data-status="PENDING_PAYMENT" bindtap="setFilter">待支付</text>
+    <text class="f {{filter === 'PREPARING' ? 'active' : ''}}" data-status="PREPARING" bindtap="setFilter">制作中</text>
+    <text class="f {{filter === 'READY' ? 'active' : ''}}" data-status="READY" bindtap="setFilter">待取餐</text>
+    <text class="f {{filter === 'COMPLETED' ? 'active' : ''}}" data-status="COMPLETED" bindtap="setFilter">已完成</text>
+  </scroll-view>
+  <view wx:for="{{orders}}" wx:key="id" class="card" data-id="{{item.id}}" bindtap="detail">
+    <view class="top">
+      <text>#{{item.pickup_no || '-'}}</text>
+      <text class="state">{{item.label}}</text>
+    </view>
+    <view class="info">
+      <text>{{item.pickup_type === 'SCHEDULED' ? '预约自取' : (item.pickup_type === 'IMMEDIATE' ? '尽快自取' : '堂食')}}</text>
+      <text class="price">¥{{item.payable_cents / 100}}</text>
+    </view>
+  </view>
+</view>

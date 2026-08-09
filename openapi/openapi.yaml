@@ -1,0 +1,757 @@
+openapi: 3.0.3
+info:
+  title: DishFlow API
+  version: 0.1.0
+  description: |
+    DishFlow 餐饮门店点餐与履约系统 API 契约（PRD §16）。
+
+    ## 约定
+    - 业务 API 前缀 `/api/v1`；JSON 使用 snake_case。
+    - 成功直接返回业务对象，或 `{items,next_cursor,total}` 列表分页。
+    - 错误统一为 `{code,message,request_id,details}`。
+    - 管理端使用 Cookie + `X-Store-Id`；小程序使用 Bearer token + `X-Wechat-Appid`。
+    - 所有关键写接口接受 `Idempotency-Key`。
+    - 金额一律 int64 分；时间使用 RFC3339。
+  contact:
+    name: DishFlow
+servers:
+  - url: http://127.0.0.1:8080
+    description: 本地开发
+
+tags:
+  - name: Health
+  - name: Storefront
+  - name: Pricing
+  - name: Orders
+  - name: Customer
+  - name: AdminSession
+  - name: Platform
+  - name: OrdersAdmin
+  - name: Menu
+  - name: Marketing
+  - name: Tables
+  - name: Analytics
+  - name: Materials
+  - name: Printing
+  - name: Callbacks
+
+paths:
+  /health/live:
+    get:
+      tags: [Health]
+      operationId: healthLive
+      security: []
+      responses:
+        '200': { description: 进程存活, content: { application/json: { schema: { $ref: '#/components/schemas/HealthLive' } } } }
+  /health/ready:
+    get:
+      tags: [Health]
+      operationId: healthReady
+      security: []
+      responses:
+        '200': { description: 就绪, content: { application/json: { schema: { $ref: '#/components/schemas/HealthReady' } } } }
+        '503': { description: 依赖不可用, content: { application/json: { schema: { $ref: '#/components/schemas/HealthUnready' } } } }
+
+  # ── 顾客/小程序（X-Wechat-Appid 解析门店，PRD §16.1）──────────────────
+  /api/v1/storefront/bootstrap:
+    get:
+      tags: [Storefront]
+      operationId: storefrontBootstrap
+      security: [{ wechatAppidHeader: [] }]
+      responses:
+        '200': { description: 门店启动信息, content: { application/json: { schema: { type: object } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/store:
+    get:
+      tags: [Storefront]
+      operationId: storeInfo
+      security: [{ wechatAppidHeader: [] }]
+      responses:
+        '200': { description: 门店信息, content: { application/json: { schema: { type: object } } } }
+  /api/v1/menu:
+    get:
+      tags: [Storefront]
+      operationId: publicMenu
+      security: [{ wechatAppidHeader: [] }]
+      responses:
+        '200': { description: 公开菜单, content: { application/json: { schema: { $ref: '#/components/schemas/PublicMenu' } } } }
+  /api/v1/pickup-slots:
+    get:
+      tags: [Storefront]
+      operationId: pickupSlots
+      security: [{ wechatAppidHeader: [] }]
+      parameters:
+        - { name: date, in: query, required: true, schema: { type: string } }
+      responses:
+        '200': { description: 预约时段, content: { application/json: { schema: { type: object } } } }
+  /api/v1/tables/resolve:
+    get:
+      tags: [Storefront]
+      operationId: resolveTable
+      security: [{ wechatAppidHeader: [] }]
+      parameters:
+        - { name: token, in: query, required: true, schema: { type: string } }
+      responses:
+        '200': { description: 桌台, content: { application/json: { schema: { type: object } } } }
+        '404': { description: 桌码无效, content: { application/json: { schema: { $ref: '#/components/schemas/Error', example: { code: TABLE_NOT_FOUND, message: table not found, request_id: req_1 } } } } }
+  /api/v1/auth/wechat/session:
+    post:
+      tags: [Storefront]
+      operationId: wechatSession
+      security: [{ wechatAppidHeader: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { code: { type: string } }, required: [code] } } } }
+      responses:
+        '200': { description: 会话, content: { application/json: { schema: { type: object, properties: { token: { type: string }, expires_at: { type: string, format: date-time } } } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /api/v1/pricing/preview:
+    post:
+      tags: [Pricing]
+      operationId: pricingPreview
+      security: [{ wechatAppidHeader: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/PricingRequest' } } } }
+      responses:
+        '200': { description: 报价, content: { application/json: { schema: { $ref: '#/components/schemas/Quote' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+  /api/v1/coupon-offers:
+    get:
+      tags: [Customer]
+      operationId: couponOffers
+      security: [{ wechatAppidHeader: [] }]
+      responses:
+        '200': { description: 可领券, content: { application/json: { schema: { $ref: '#/components/schemas/List' } } } }
+  /api/v1/orders:
+    post:
+      tags: [Orders]
+      operationId: createOrder
+      security: [{ customerBearer: [], wechatAppidHeader: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKeyHeader' }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { quote_token: { type: string }, remark: { type: string, maxLength: 100 } }, required: [quote_token] } } } }
+      responses:
+        '201': { description: 订单, content: { application/json: { schema: { $ref: '#/components/schemas/Order' } } } }
+        '409': { description: 冲突（PICKUP_SLOT_FULL/库存不足/报价不匹配）, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '410': { description: 报价过期, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    get:
+      tags: [Orders]
+      operationId: myOrders
+      security: [{ customerBearer: [], wechatAppidHeader: [] }]
+      parameters:
+        - { name: status, in: query, schema: { type: string } }
+      responses:
+        '200': { description: 我的订单, content: { application/json: { schema: { $ref: '#/components/schemas/List' } } } }
+  /api/v1/orders/{id}:
+    get:
+      tags: [Orders]
+      operationId: myOrderDetail
+      security: [{ customerBearer: [], wechatAppidHeader: [] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses:
+        '200': { description: 订单详情, content: { application/json: { schema: { $ref: '#/components/schemas/OrderDetail' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/orders/{id}/prepay:
+    post:
+      tags: [Orders]
+      operationId: prepay
+      security: [{ customerBearer: [], wechatAppidHeader: [] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses:
+        '200': { description: 预支付, content: { application/json: { schema: { type: object, properties: { prepay_id: { type: string }, mock_payment: { type: boolean }, jsapi_payload: { type: object } } } } } }
+        '503': { description: 支付不可用, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /api/v1/orders/{id}/mock-payment/confirm:
+    post:
+      tags: [Orders]
+      operationId: confirmMockPayment
+      security: [{ customerBearer: [], wechatAppidHeader: [] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses:
+        '200': { description: 确认中, content: { application/json: { schema: { type: object } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+  /api/v1/me:
+    get:
+      tags: [Customer]
+      operationId: me
+      security: [{ customerBearer: [], wechatAppidHeader: [] }]
+      responses:
+        '200': { description: 顾客概览, content: { application/json: { schema: { type: object } } } }
+  /api/v1/me/membership:
+    post:
+      tags: [Customer]
+      operationId: joinMembership
+      security: [{ customerBearer: [], wechatAppidHeader: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { phone: { type: string }, country_code: { type: string } }, required: [phone] } } } }
+      responses:
+        '200': { description: 入会, content: { application/json: { schema: { type: object } } } }
+        '409': { description: 手机号已绑定他人, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /api/v1/me/points:
+    get:
+      tags: [Customer]
+      operationId: myPoints
+      security: [{ customerBearer: [], wechatAppidHeader: [] }]
+      responses:
+        '200': { description: 积分流水, content: { application/json: { schema: { $ref: '#/components/schemas/List' } } } }
+  /api/v1/coupons:
+    get:
+      tags: [Customer]
+      operationId: myCoupons
+      security: [{ customerBearer: [], wechatAppidHeader: [] }]
+      parameters:
+        - { name: status, in: query, schema: { type: string } }
+      responses:
+        '200': { description: 我的券, content: { application/json: { schema: { $ref: '#/components/schemas/List' } } } }
+  /api/v1/coupon-offers/{template_id}/claim:
+    post:
+      tags: [Customer]
+      operationId: claimCoupon
+      security: [{ customerBearer: [], wechatAppidHeader: [] }]
+      parameters: [{ name: template_id, in: path, required: true, schema: { type: integer, format: int64 } }]
+      responses:
+        '201': { description: 已领取, content: { application/json: { schema: { type: object } } } }
+        '200': { description: 已领过（幂等）, content: { application/json: { schema: { type: object } } } }
+
+  # ── 管理会话 ─────────────────────────────────────────────────────────
+  /api/v1/admin/session:
+    post:
+      tags: [AdminSession]
+      operationId: adminLogin
+      security: []
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { login: { type: string }, password: { type: string } }, required: [login, password] } } } }
+      responses:
+        '200': { description: 登录成功, content: { application/json: { schema: { type: object } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { description: 限速, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    delete:
+      tags: [AdminSession]
+      operationId: adminLogout
+      security: [{ adminCookie: [] }]
+      responses:
+        '200': { description: 退出（幂等）, content: { application/json: { schema: { type: object } } } }
+    get:
+      tags: [AdminSession]
+      operationId: adminSession
+      security: [{ adminCookie: [] }]
+      responses:
+        '200': { description: 当前账号/门店/角色, content: { application/json: { schema: { type: object } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  # ── 平台（超管）──────────────────────────────────────────────────────
+  /api/v1/admin/platform/stores:
+    post:
+      tags: [Platform]
+      operationId: platformCreateStore
+      security: [{ adminCookie: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses:
+        '201': { description: 门店, content: { application/json: { schema: { type: object } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    get:
+      tags: [Platform]
+      operationId: platformListStores
+      security: [{ adminCookie: [] }]
+      parameters: [{ $ref: '#/components/parameters/Limit' }, { $ref: '#/components/parameters/Cursor' }]
+      responses:
+        '200': { description: 门店列表, content: { application/json: { schema: { $ref: '#/components/schemas/List' } } } }
+  /api/v1/admin/platform/stores/{id}:
+    patch:
+      tags: [Platform]
+      operationId: platformPatchStore
+      security: [{ adminCookie: [] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses:
+        '200': { description: 门店, content: { application/json: { schema: { type: object } } } }
+  /api/v1/admin/platform/users:
+    post:
+      tags: [Platform]
+      operationId: platformCreateUser
+      security: [{ adminCookie: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { login: { type: string }, display_name: { type: string }, password: { type: string, minLength: 12, maxLength: 72 }, is_platform_admin: { type: boolean } }, required: [login, password] } } } }
+      responses:
+        '201': { description: 账号, content: { application/json: { schema: { type: object } } } }
+        '409': { description: 登录名冲突, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    get:
+      tags: [Platform]
+      operationId: platformListUsers
+      security: [{ adminCookie: [] }]
+      parameters: [{ $ref: '#/components/parameters/Limit' }, { $ref: '#/components/parameters/Cursor' }]
+      responses:
+        '200': { description: 账号列表, content: { application/json: { schema: { $ref: '#/components/schemas/List' } } } }
+  /api/v1/admin/platform/users/{id}:
+    patch:
+      tags: [Platform]
+      operationId: platformPatchUser
+      security: [{ adminCookie: [] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses:
+        '200': { description: 账号, content: { application/json: { schema: { type: object } } } }
+  /api/v1/admin/platform/users/{id}/assign-store-owner:
+    post:
+      tags: [Platform]
+      operationId: assignStoreOwner
+      security: [{ adminCookie: [] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { store_id: { type: integer, format: int64 } }, required: [store_id] } } } }
+      responses:
+        '200': { description: 已指定, content: { application/json: { schema: { type: object } } } }
+        '409': { description: 账号已归属其它门店, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /api/v1/admin/platform/shop-applications:
+    get:
+      tags: [Platform]
+      operationId: platformListShopApplications
+      security: [{ adminCookie: [] }]
+      parameters: [{ name: status, in: query, schema: { type: string } }]
+      responses:
+        '200': { description: 申请列表, content: { application/json: { schema: { $ref: '#/components/schemas/List' } } } }
+  /api/v1/admin/platform/shop-applications/{id}/review:
+    post:
+      tags: [Platform]
+      operationId: reviewShopApplication
+      security: [{ adminCookie: [] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { decision: { type: string, enum: [APPROVE, REJECT] }, note: { type: string } }, required: [decision] } } } }
+      responses:
+        '200': { description: 审批结果, content: { application/json: { schema: { type: object } } } }
+        '409': { description: 已审批/不可重复建店, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /api/v1/admin/shop-applications:
+    post:
+      tags: [Platform]
+      operationId: submitShopApplication
+      security: [{ adminCookie: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses:
+        '201': { description: 已提交, content: { application/json: { schema: { type: object } } } }
+  /api/v1/admin/my/shop-applications:
+    get:
+      tags: [Platform]
+      operationId: myShopApplications
+      security: [{ adminCookie: [] }]
+      responses:
+        '200': { description: 我的申请, content: { application/json: { schema: { $ref: '#/components/schemas/List' } } } }
+  /api/v1/admin/shop-join-requests:
+    post:
+      tags: [Platform]
+      operationId: submitShopJoinRequest
+      security: [{ adminCookie: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses:
+        '201': { description: 已提交, content: { application/json: { schema: { type: object } } } }
+  /api/v1/admin/my/shop-join-requests:
+    get:
+      tags: [Platform]
+      operationId: myShopJoinRequests
+      security: [{ adminCookie: [] }]
+      responses:
+        '200': { description: 我的加入申请, content: { application/json: { schema: { $ref: '#/components/schemas/List' } } } }
+
+  # ── 订单工作台（X-Store-Id + 成员关系，PRD §6）─────────────────────────
+  /api/v1/admin/orders/board:
+    get:
+      tags: [OrdersAdmin]
+      operationId: orderBoard
+      security: [{ adminCookie: [], storeIdHeader: [] }]
+      responses:
+        '200': { description: 工作台四列, content: { application/json: { schema: { type: object } } } }
+  /api/v1/admin/orders/{id}:
+    get:
+      tags: [OrdersAdmin]
+      operationId: adminOrderDetail
+      security: [{ adminCookie: [], storeIdHeader: [] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses:
+        '200': { description: 订单详情, content: { application/json: { schema: { $ref: '#/components/schemas/OrderDetail' } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/admin/orders/{id}/transitions:
+    post:
+      tags: [OrdersAdmin]
+      operationId: orderTransition
+      security: [{ adminCookie: [], storeIdHeader: [] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { to: { type: string }, expected_version: { type: integer, format: int64 } }, required: [to, expected_version] } } } }
+      responses:
+        '200': { description: 推进后订单, content: { application/json: { schema: { $ref: '#/components/schemas/Order' } } } }
+        '409': { description: 状态/版本冲突, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  # ── 菜单/库存（PRD §7）───────────────────────────────────────────────
+  /api/v1/admin/categories:
+    get:
+      tags: [Menu]
+      operationId: listCategories
+      security: [{ adminCookie: [], storeIdHeader: [] }]
+      parameters: [{ name: deleted, in: query, schema: { type: boolean } }]
+      responses:
+        '200': { description: 分类列表, content: { application/json: { schema: { $ref: '#/components/schemas/List' } } } }
+    post:
+      tags: [Menu]
+      operationId: createCategory
+      security: [{ adminCookie: [], storeIdHeader: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses:
+        '201': { description: 分类, content: { application/json: { schema: { type: object } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /api/v1/admin/categories/{id}:
+    patch:
+      tags: [Menu]
+      operationId: patchCategory
+      security: [{ adminCookie: [], storeIdHeader: [] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses:
+        '200': { description: 分类, content: { application/json: { schema: { type: object } } } }
+    delete:
+      tags: [Menu]
+      operationId: deleteCategory
+      security: [{ adminCookie: [], storeIdHeader: [] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses:
+        '200': { description: 已软删除（30 天回收站）, content: { application/json: { schema: { type: object } } } }
+  /api/v1/admin/categories/{id}/restore:
+    post:
+      tags: [Menu]
+      operationId: restoreCategory
+      security: [{ adminCookie: [], storeIdHeader: [] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses:
+        '200': { description: 已恢复（含同批菜品）, content: { application/json: { schema: { type: object } } } }
+        '409': { description: 恢复窗口已过/父分类未恢复, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /api/v1/admin/dishes:
+    get:
+      tags: [Menu]
+      operationId: listDishes
+      security: [{ adminCookie: [], storeIdHeader: [] }]
+      parameters:
+        - { name: category_id, in: query, schema: { type: integer, format: int64 } }
+        - { name: deleted, in: query, schema: { type: boolean } }
+      responses:
+        '200': { description: 菜品列表, content: { application/json: { schema: { $ref: '#/components/schemas/List' } } } }
+    post:
+      tags: [Menu]
+      operationId: createDish
+      security: [{ adminCookie: [], storeIdHeader: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/DishCreate' } } } }
+      responses:
+        '201': { description: 菜品, content: { application/json: { schema: { type: object } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+  /api/v1/admin/dishes/{id}:
+    get:
+      tags: [Menu]
+      operationId: getDish
+      security: [{ adminCookie: [], storeIdHeader: [] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses:
+        '200': { description: 菜品详情, content: { application/json: { schema: { type: object } } } }
+    delete:
+      tags: [Menu]
+      operationId: deleteDish
+      security: [{ adminCookie: [], storeIdHeader: [] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses:
+        '200': { description: 已软删除, content: { application/json: { schema: { type: object } } } }
+  /api/v1/admin/dishes/{id}/restore:
+    post:
+      tags: [Menu]
+      operationId: restoreDish
+      security: [{ adminCookie: [], storeIdHeader: [] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses:
+        '200': { description: 已恢复, content: { application/json: { schema: { type: object } } } }
+  /api/v1/admin/dishes/{id}/stock-adjustments:
+    post:
+      tags: [Menu]
+      operationId: adjustStock
+      security: [{ adminCookie: [], storeIdHeader: [] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }, { $ref: '#/components/parameters/IdempotencyKeyHeader' }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { business_date: { type: string }, delta: { type: integer }, reason: { type: string } }, required: [business_date, delta, reason] } } } }
+      responses:
+        '200': { description: 已调整, content: { application/json: { schema: { type: object } } } }
+        '409': { description: 违反不变量/幂等冲突, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    get:
+      tags: [Menu]
+      operationId: listStockMovements
+      security: [{ adminCookie: [], storeIdHeader: [] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }, { name: business_date, in: query, schema: { type: string } }]
+      responses:
+        '200': { description: 库存流水, content: { application/json: { schema: { $ref: '#/components/schemas/List' } } } }
+
+  # ── 营销/会员/桌台（PRD §7.4/§8/§10.1）───────────────────────────────
+  /api/v1/admin/promotions:
+    get:
+      tags: [Marketing]
+      operationId: listPromotions
+      security: [{ adminCookie: [], storeIdHeader: [] }]
+      responses:
+        '200': { description: 满减列表, content: { application/json: { schema: { $ref: '#/components/schemas/List' } } } }
+    post:
+      tags: [Marketing]
+      operationId: createPromotion
+      security: [{ adminCookie: [], storeIdHeader: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses:
+        '201': { description: 满减, content: { application/json: { schema: { type: object } } } }
+  /api/v1/admin/tables:
+    get:
+      tags: [Tables]
+      operationId: listTables
+      security: [{ adminCookie: [], storeIdHeader: [] }]
+      responses:
+        '200': { description: 桌台列表, content: { application/json: { schema: { $ref: '#/components/schemas/List' } } } }
+    post:
+      tags: [Tables]
+      operationId: createTable
+      security: [{ adminCookie: [], storeIdHeader: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses:
+        '201': { description: 桌台（含 token）, content: { application/json: { schema: { type: object } } } }
+  /api/v1/admin/tables/{id}/rotate-token:
+    post:
+      tags: [Tables]
+      operationId: rotateTableToken
+      security: [{ adminCookie: [], storeIdHeader: [] }]
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses:
+        '200': { description: 新 token, content: { application/json: { schema: { type: object } } } }
+  /api/v1/admin/customer-members/{customerId}/points-adjustments:
+    post:
+      tags: [Marketing]
+      operationId: pointsAdjustment
+      security: [{ adminCookie: [], storeIdHeader: [] }]
+      parameters: [{ name: customerId, in: path, required: true, schema: { type: integer, format: int64 } }, { $ref: '#/components/parameters/IdempotencyKeyHeader' }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { delta: { type: integer }, reason: { type: string } }, required: [delta, reason] } } } }
+      responses:
+        '200': { description: 调整后余额, content: { application/json: { schema: { type: object } } } }
+        '409': { description: 积分不足, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  # ── 分析/导入导出（PRD §9/§11）───────────────────────────────────────
+  /api/v1/admin/analytics/overview:
+    get:
+      tags: [Analytics]
+      operationId: analyticsOverview
+      security: [{ adminCookie: [], storeIdHeader: [] }]
+      parameters: [{ name: start, in: query, schema: { type: string, format: date-time } }, { name: end, in: query, schema: { type: string, format: date-time } }]
+      responses:
+        '200': { description: 概览, content: { application/json: { schema: { type: object } } } }
+  /api/v1/admin/analytics/trends:
+    get:
+      tags: [Analytics]
+      operationId: analyticsTrends
+      security: [{ adminCookie: [], storeIdHeader: [] }]
+      responses:
+        '200': { description: 趋势, content: { application/json: { schema: { type: object } } } }
+  /api/v1/admin/analytics/breakdown:
+    get:
+      tags: [Analytics]
+      operationId: analyticsBreakdown
+      security: [{ adminCookie: [], storeIdHeader: [] }]
+      responses:
+        '200': { description: 分布, content: { application/json: { schema: { type: object } } } }
+  /api/v1/admin/store/export:
+    get:
+      tags: [Analytics]
+      operationId: storeExport
+      security: [{ adminCookie: [], storeIdHeader: [] }]
+      responses:
+        '200': { description: 备份文件, content: { application/json: { schema: { $ref: '#/components/schemas/StoreExport' } } } }
+  /api/v1/admin/store/import:
+    post:
+      tags: [Analytics]
+      operationId: storeImport
+      security: [{ adminCookie: [], storeIdHeader: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/StoreExport' } } } }
+      responses:
+        '200': { description: 已导入, content: { application/json: { schema: { type: object } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { description: AppID 冲突, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  # ── 物料/采购/打印（PRD §12/§13）────────────────────────────────────
+  /api/v1/admin/materials:
+    get:
+      tags: [Materials]
+      operationId: listMaterials
+      security: [{ adminCookie: [], storeIdHeader: [] }]
+      responses:
+        '200': { description: 物料列表, content: { application/json: { schema: { $ref: '#/components/schemas/List' } } } }
+    post:
+      tags: [Materials]
+      operationId: createMaterial
+      security: [{ adminCookie: [], storeIdHeader: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses:
+        '201': { description: 物料, content: { application/json: { schema: { type: object } } } }
+  /api/v1/admin/purchase-lists:
+    post:
+      tags: [Materials]
+      operationId: createPurchaseList
+      security: [{ adminCookie: [], storeIdHeader: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses:
+        '201': { description: 草稿清单, content: { application/json: { schema: { type: object } } } }
+  /api/v1/admin/print/config:
+    get:
+      tags: [Printing]
+      operationId: getPrintConfig
+      security: [{ adminCookie: [], storeIdHeader: [] }]
+      responses:
+        '200': { description: 配置状态（不回显密钥）, content: { application/json: { schema: { type: object } } } }
+
+  # ── 微信支付/退款回调（PRD §14.2/§14.3）──────────────────────────────
+  /callbacks/wechat-pay/transactions/{store_id}:
+    post:
+      tags: [Callbacks]
+      operationId: wechatPayCallback
+      security: []
+      parameters: [{ name: store_id, in: path, required: true, schema: { type: integer, format: int64 } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses:
+        '200': { description: 成功（幂等）, content: { application/json: { schema: { type: object, properties: { code: { type: string, enum: [SUCCESS] } } } } } }
+        '400': { description: 验签/门店不符 fail closed, content: { application/json: { schema: { type: object, properties: { code: { type: string, enum: [FAIL] } } } } } }
+
+components:
+  securitySchemes:
+    customerBearer:
+      type: http
+      scheme: bearer
+    adminCookie:
+      type: apiKey
+      in: cookie
+      name: shop_session
+    storeIdHeader:
+      type: apiKey
+      in: header
+      name: X-Store-Id
+    wechatAppidHeader:
+      type: apiKey
+      in: header
+      name: X-Wechat-Appid
+  parameters:
+    PathId:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, maximum: 100, default: 20 }
+    Cursor:
+      name: cursor
+      in: query
+      schema: { type: string }
+    RequestIdHeader:
+      name: X-Request-Id
+      in: header
+      schema: { type: string, maxLength: 64, pattern: '^[A-Za-z0-9._:-]{1,64}$' }
+    IdempotencyKeyHeader:
+      name: Idempotency-Key
+      in: header
+      schema: { type: string, maxLength: 100 }
+  responses:
+    BadRequest: { description: 请求错误, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Unauthorized: { description: 未认证, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Forbidden: { description: 无权限, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    NotFound: { description: 不存在, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  schemas:
+    HealthLive: { type: object, properties: { status: { type: string, enum: [ok] } }, required: [status] }
+    HealthReady: { type: object, properties: { status: { type: string, enum: [ready] } }, required: [status] }
+    HealthUnready:
+      type: object
+      properties:
+        status: { type: string, enum: [unavailable] }
+        problems: { type: array, items: { type: string } }
+      required: [status, problems]
+    Error:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code:
+          type: string
+          enum: [INTERNAL, BAD_REQUEST, UNAUTHORIZED, FORBIDDEN, NOT_FOUND, CONFLICT, STATE_CONFLICT, RATE_LIMITED, QUOTE_EXPIRED, QUOTE_MISMATCH, TABLE_NOT_FOUND, TABLE_DISABLED, PICKUP_SLOT_FULL, PICKUP_TIME_INVALID, PAYMENT_UNAVAILABLE, REFUND_CONFLICT, INSUFFICIENT_POINTS, WECHAT_APPID_CONFLICT]
+        message: { type: string }
+        request_id: { type: string }
+        details: {}
+    List:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: {} }
+        next_cursor: { type: string }
+        total: { type: integer, format: int64 }
+    PricingRequest:
+      type: object
+      properties:
+        scenario: { type: string, enum: [DINE_IN, PICKUP] }
+        table_token: { type: string }
+        scheduled_for: { type: string }
+        cart:
+          type: array
+          items:
+            type: object
+            properties:
+              sku_id: { type: integer, format: int64 }
+              quantity: { type: integer, minimum: 1, maximum: 99 }
+              option_ids: { type: array, items: { type: integer, format: int64 } }
+      required: [scenario, cart]
+    Quote:
+      type: object
+      properties:
+        item_amount_cents: { type: integer, format: int64 }
+        packaging_fee_cents: { type: integer, format: int64 }
+        discount_cents: { type: integer, format: int64 }
+        payable_cents: { type: integer, format: int64 }
+        quote_token: { type: string }
+        expires_at: { type: integer, format: int64 }
+    Order:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        order_no: { type: string }
+        pickup_no: { type: integer, nullable: true }
+        scenario: { type: string }
+        pickup_type: { type: string }
+        payable_cents: { type: integer, format: int64 }
+        fulfillment_state: { type: string }
+        version: { type: integer, format: int64 }
+    OrderDetail:
+      allOf:
+        - $ref: '#/components/schemas/Order'
+        - type: object
+          properties:
+            items: { type: array, items: {} }
+            events: { type: array, items: {} }
+    DishCreate:
+      type: object
+      properties:
+        category_id: { type: integer, format: int64 }
+        name: { type: string }
+        packaging_fee_cents: { type: integer, format: int64 }
+        skus:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              price_cents: { type: integer, format: int64 }
+              inventory_mode: { type: string, enum: [UNLIMITED, DAILY] }
+        option_groups:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              selection_type: { type: string, enum: [SINGLE, MULTI] }
+              is_required: { type: boolean }
+              min_select: { type: integer }
+              max_select: { type: integer }
+      required: [category_id, name, skus]
+    StoreExport:
+      type: object
+      properties:
+        format: { type: string, enum: [dishflow.store-export] }
+        version: { type: integer, enum: [1] }
+        exported_at: { type: string, format: date-time }
+        source_store_id: { type: integer, format: int64 }
+    PublicMenu:
+      type: object
+      properties:
+        store_id: { type: integer, format: int64 }
+        categories: { type: array, items: {} }
+        dishes: { type: array, items: {} }
+
+security: []

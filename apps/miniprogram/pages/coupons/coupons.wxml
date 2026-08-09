@@ -1,0 +1,16 @@
+<view class="coupons">
+  <view class="title">我的优惠券</view>
+  <view wx:for="{{mine}}" wx:key="id" class="coupon {{item.status}}">
+    <text class="amt">¥{{item.discount_cents / 100}}</text>
+    <text class="cond">满¥{{item.min_spend_cents / 100}}可用</text>
+    <text class="status">{{item.status}}</text>
+  </view>
+  <view wx:if="{{mine.length === 0}}" class="empty">暂无优惠券</view>
+
+  <view class="title">领券中心</view>
+  <view wx:for="{{offers}}" wx:key="id" class="coupon offer">
+    <text class="amt">¥{{item.discount_cents / 100}}</text>
+    <text class="cond">满¥{{item.min_spend_cents / 100}}可用</text>
+    <button size="mini" data-id="{{item.id}}" bindtap="claim">领取</button>
+  </view>
+</view>

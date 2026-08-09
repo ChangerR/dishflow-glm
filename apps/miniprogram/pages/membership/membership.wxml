@@ -1,0 +1,12 @@
+<view class="join">
+  <view class="card">
+    <view class="benefit">入会享积分、新人券与会员专属优惠</view>
+    <view class="agree">
+      <checkbox checked="{{agreed}}" bindtap="toggleAgree" />
+      <text>我已阅读并同意《会员协议》《隐私政策》</text>
+    </view>
+    <button type="primary" open-type="getPhoneNumber" bindgetphonenumber="getPhone" disabled="{{loading}}">
+      微信手机号一键入会
+    </button>
+  </view>
+</view>

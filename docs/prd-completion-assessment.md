@@ -159,15 +159,25 @@ PRD 有、代码无的页面：平台门店/用户/开店审批、开店与加�
 
 ### 截图产物
 
-已在本机打开并登录管理端，截取：
+已在本机打开并登录管理端，截取（仓库内相对路径，便于 `raw.githubusercontent.com` 访问）：
 
-| 页面 | 产物路径 |
+| 页面 | 路径 |
 | --- | --- |
-| 登录 | `/opt/cursor/artifacts/admin_login.webp` |
-| 订单工作台 | `/opt/cursor/artifacts/admin_board.webp` |
-| 分类 | `/opt/cursor/artifacts/admin_categories.webp` |
-| 菜品/库存 | `/opt/cursor/artifacts/admin_dishes.webp` |
-| 经营分析 | `/opt/cursor/artifacts/admin_analytics.webp` |
+| 登录 | [`docs/screenshots/admin_login.webp`](screenshots/admin_login.webp) |
+| 订单工作台 | [`docs/screenshots/admin_board.webp`](screenshots/admin_board.webp) |
+| 分类 | [`docs/screenshots/admin_categories.webp`](screenshots/admin_categories.webp) |
+| 菜品/库存 | [`docs/screenshots/admin_dishes.webp`](screenshots/admin_dishes.webp) |
+| 经营分析 | [`docs/screenshots/admin_analytics.webp`](screenshots/admin_analytics.webp) |
+
+![登录](screenshots/admin_login.webp)
+
+![订单工作台](screenshots/admin_board.webp)
+
+![分类](screenshots/admin_categories.webp)
+
+![菜品/库存](screenshots/admin_dishes.webp)
+
+![经营分析](screenshots/admin_analytics.webp)
 
 工作台可见四列各 1 单；分类有「招牌主食」「饮品」；菜品 4 道；分析支付金额 111.50 / 4 单。侧栏同时暴露了满减、桌台、会员、物料、备份等入口（未全部截图，页面存在但能力偏薄）。
 
